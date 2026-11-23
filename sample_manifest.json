@@ -1,0 +1,13 @@
+{
+  "album": "PhotoSyncVault",
+  "images": [
+    {
+      "name": "photo_04.jpg",
+      "url": "https://example.com/photos/photo_04.jpg"
+    },
+    {
+      "name": "photo_05.png",
+      "url": "https://example.com/photos/photo_05.png"
+    }
+  ]
+}

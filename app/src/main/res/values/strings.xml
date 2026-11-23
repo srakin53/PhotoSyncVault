@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">PhotoSyncVault</string>
+    <string name="default_sync_url" translatable="false"></string>
+</resources>
