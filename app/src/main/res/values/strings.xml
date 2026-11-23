@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">PhotoSyncVault</string>
-    <string name="default_sync_url" translatable="false"></string>
+    <string name="default_sync_url" translatable="false">https://srakin53.github.io/PhotoSyncVault/manifest.json</string>
 </resources>
