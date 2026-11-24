@@ -44,6 +44,7 @@ data class SyncResult(
   val skippedCount: Int,
   val failedCount: Int,
   val totalRemoteCount: Int,
+  val deletedCount: Int = 0,
 )
 
 class PhotoVaultManager(private val context: Context) {
@@ -162,8 +163,33 @@ class PhotoVaultManager(private val context: Context) {
     }
 
     val entries = fetchManifestEntries(cleanUrl)
+    val remoteNames = entries.map { it.name }.toSet()
     val savedNames = getSavedGalleryNames().toMutableSet()
-    val bundledSet = listBundledAssetNames().toSet()
+    val rawBundledNames = listRawBundledAssetNames()
+    val hiddenBundled = rawBundledNames.filterNot { remoteNames.contains(it) }.toSet()
+    prefs.edit().putStringSet(KEY_HIDDEN_BUNDLED_NAMES, hiddenBundled).apply()
+
+    var deleted = 0
+    syncedDir.listFiles()
+      ?.filter { it.isFile && !remoteNames.contains(it.name) }
+      ?.forEach { staleFile ->
+        val removedFile = staleFile.delete()
+        val removedGallery = deleteFromGallery(staleFile.name)
+        val removedSaved = savedNames.remove(staleFile.name)
+        if (removedFile || removedGallery || removedSaved) {
+          deleted++
+        }
+      }
+
+    hiddenBundled.forEach { staleBundledName ->
+      val removedSaved = savedNames.remove(staleBundledName)
+      val removedGallery = deleteFromGallery(staleBundledName)
+      if (removedSaved || removedGallery) {
+        deleted++
+      }
+    }
+
+    val bundledSet = rawBundledNames.filterNot { hiddenBundled.contains(it) }.toSet()
 
     var downloaded = 0
     var skipped = 0
@@ -207,16 +233,25 @@ class PhotoVaultManager(private val context: Context) {
       skippedCount = skipped,
       failedCount = failed,
       totalRemoteCount = entries.size,
+      deletedCount = deleted,
     )
   }
 
-  private fun listBundledAssetNames(): List<String> =
+  private fun listRawBundledAssetNames(): List<String> =
     runCatching {
       context.assets.list(ASSETS_PHOTOS_DIR)
         ?.filter { isSupportedImage(it) }
         ?.sorted()
         .orEmpty()
     }.getOrDefault(emptyList())
+
+  private fun listBundledAssetNames(): List<String> {
+    val hidden = getHiddenBundledNames()
+    return listRawBundledAssetNames().filterNot { hidden.contains(it) }
+  }
+
+  private fun getHiddenBundledNames(): Set<String> =
+    prefs.getStringSet(KEY_HIDDEN_BUNDLED_NAMES, emptySet()) ?: emptySet()
 
   private fun openPhotoStream(photo: VaultPhoto): InputStream? =
     if (photo.isBundled) {
@@ -263,6 +298,25 @@ class PhotoVaultManager(private val context: Context) {
       return true
     }
   }
+
+  private fun deleteFromGallery(fileName: String): Boolean =
+    runCatching {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val selection = "${MediaStore.Images.Media.DISPLAY_NAME} = ? AND ${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
+        val args = arrayOf(fileName, "${Environment.DIRECTORY_PICTURES}/$ALBUM_NAME%")
+        context.contentResolver.delete(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, selection, args) > 0
+      } else {
+        @Suppress("DEPRECATION")
+        val picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+        val target = File(File(picturesDir, ALBUM_NAME), fileName)
+        if (target.exists() && target.delete()) {
+          MediaScannerConnection.scanFile(context, arrayOf(target.absolutePath), null, null)
+          true
+        } else {
+          false
+        }
+      }
+    }.getOrDefault(false)
 
   private fun fetchManifestEntries(manifestUrl: String): List<RemoteImageEntry> {
     val conn = (URL(manifestUrl).openConnection() as HttpURLConnection).apply {
@@ -365,6 +419,7 @@ class PhotoVaultManager(private val context: Context) {
     private const val KEY_SYNC_URL = "sync_url"
     private const val KEY_AUTO_SYNC = "auto_sync"
     private const val KEY_SAVED_NAMES = "saved_gallery_names"
+    private const val KEY_HIDDEN_BUNDLED_NAMES = "hidden_bundled_names"
     private const val ASSETS_PHOTOS_DIR = "photos"
     private const val SYNCED_DIR_NAME = "synced_photos"
     const val ALBUM_NAME = "PhotoSyncVault"

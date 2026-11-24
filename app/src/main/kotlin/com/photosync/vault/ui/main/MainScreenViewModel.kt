@@ -134,6 +134,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
         }
         val msg = buildString {
           append("Đồng bộ xong: tải mới ${result.downloadedCount} ảnh")
+          if (result.deletedCount > 0) append(" • Đã xóa ${result.deletedCount} ảnh cũ")
           if (result.skippedCount > 0) append(" • Đã có ${result.skippedCount} ảnh")
           if (result.failedCount > 0) append(" • Lỗi ${result.failedCount} ảnh")
         }
@@ -143,7 +144,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
             isBusy = false,
             progressLabel = "",
             statusMessage = msg,
-            isError = result.failedCount > 0 && result.downloadedCount == 0,
+            isError = result.failedCount > 0 && result.downloadedCount == 0 && result.deletedCount == 0,
           )
         }
       } catch (e: Exception) {
