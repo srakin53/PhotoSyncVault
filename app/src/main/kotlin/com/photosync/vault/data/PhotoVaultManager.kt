@@ -204,13 +204,17 @@ class PhotoVaultManager(private val context: Context) {
       }
 
       val ok = runCatching {
-        if (!targetFile.exists()) {
+        val isBundled = bundledSet.contains(entry.name)
+        if (!targetFile.exists() && !isBundled) {
           downloadFile(entry.url, targetFile)
         }
         if (!savedNames.contains(entry.name)) {
-          targetFile.inputStream().use { stream ->
-            saveStreamToGallery(entry.name, stream)
+          val stream = if (targetFile.exists()) {
+            targetFile.inputStream()
+          } else {
+            context.assets.open("$ASSETS_PHOTOS_DIR/${entry.name}")
           }
+          stream.use { saveStreamToGallery(entry.name, it) }
         } else {
           true
         }
