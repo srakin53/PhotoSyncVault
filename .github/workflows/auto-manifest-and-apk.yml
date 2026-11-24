@@ -12,7 +12,6 @@ permissions:
 
 jobs:
   publish-photos-pages:
-    needs: build-apk
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -40,15 +39,6 @@ jobs:
               json.dump(manifest, fp, ensure_ascii=False, indent=2)
           print(f"Generated manifest.json with {len(files)} images.")
           EOF
-
-      - name: Download built APK for direct link
-        uses: actions/download-artifact@v4
-        with:
-          name: PhotoSyncVault-debug-apk
-          path: _site
-
-      - name: Rename APK for direct download
-        run: mv _site/app-debug.apk _site/PhotoSyncVault.apk
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
